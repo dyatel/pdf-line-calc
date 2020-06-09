@@ -11,25 +11,39 @@ const UPLOAD_SVG = __DIR__.UPLOAD_SVG_SRC;
 $file = $_FILES['upload'];
 
 // определяем шаблонные переменные
-list($src, $svg) = (function ($file) {
+$output = (function ($file) {
     $data = [];
     //
     if($file){
-        if(!copy($file['tmp_name'], UPLOAD_ORIGINAL."/".$file['name']))
+        if(!copy($file['tmp_name'], UPLOAD_ORIGINAL.$file['name']))
             throw new Exception("Unable copy file to uploads directory");
 
-        // конвертируем в svg при помощи inkscape
-        exec(sprintf('inkscape -l %s%s.svg %s%s 2>&1', UPLOAD_SVG, $file['name'], UPLOAD_ORIGINAL, $file['name']), $out, $return);
+        $img = new Imagick();
+        $img->pingImage(UPLOAD_ORIGINAL.$file['name']);
 
-        // если скрипт вернул не 0, отображаем вывод
-        if($return){
-            var_dump('<pre>', $out, '</pre>');
-            return $data;
+        for($p = 1; $p <= $img->getNumberImages(); $p++){
+            // конвертируем в svg при помощи inkscape
+            exec(
+                    sprintf(
+                            'inkscape -l --export-filename="%1$s%3$s_%4$d.svg" --pdf-page=%4$d "%2$s%3$s" 2>&1',
+                            UPLOAD_SVG, UPLOAD_ORIGINAL, $file['name'], $p
+                    ),
+                    $out,
+                    $return
+            );
+            // если скрипт вернул не 0, отображаем вывод
+            if($return){
+                var_dump('<pre>', $out, '</pre>');
+                return $data;
+            }
+            //
+            $data[] = [
+                // присваиваем $src
+                'src' => UPLOAD_SVG_SRC."{$file['name']}_{$p}.svg",
+                // присваиваем $svg
+                'svg' => file_get_contents(UPLOAD_SVG."{$file['name']}_{$p}.svg")
+            ];
         }
-        // присваиваем $src
-        $data[] = UPLOAD_SVG_SRC."{$file['name']}.svg";
-        // присваиваем $svg
-        $data[] = file_get_contents(UPLOAD_SVG."{$file['name']}.svg");
     }
     //
     return $data;
@@ -45,9 +59,9 @@ list($src, $svg) = (function ($file) {
     <style> div{ margin: 10px 0; } </style>
     <script>
         // функция расчета длины путей в svg
-        function calcLine(){
+        function calcLine($page){
             // убираем все зависимости
-            document.querySelectorAll('#svg svg defs').forEach(function(el){
+            document.querySelectorAll('.svg_'+$page+' svg defs').forEach(function(el){
                 el.remove();
             });
 
@@ -56,17 +70,17 @@ list($src, $svg) = (function ($file) {
                 length = 0;
 
             // считаем длину всех путей
-            document.querySelectorAll('#svg svg g path').forEach(function(p){
-                length += p.getTotalLength();
+            document.querySelectorAll('.svg_'+$page+' svg g path').forEach(function(p){
+                if(p.style.fill === 'none')
+                    length += p.getTotalLength();
             });
 
             // выводим результат
-            document.querySelector('.in_px_result').innerHTML = Math.round(length);
-            document.querySelector('.in_mm_result').innerHTML = Math.round(length*ratio);
+            document.querySelector('.in_px_result_'+$page).innerHTML = Math.round(length);
+            document.querySelector('.in_mm_result_'+$page).innerHTML = Math.round(length*ratio);
         }
     </script>
 </head>
-
 <body>
     <div>
         <strong>Выберите файл (.pdf, .ai, .eps):</strong>
@@ -77,22 +91,22 @@ list($src, $svg) = (function ($file) {
         <input type="submit" value="Загрузить">
     </form>
 
-    <?php if($src):?>
-        <!--  Результат  -->
-        <div>
-            <strong>Длина реза: <span class="in_mm_result">0</span> mm, <span class="in_px_result">0</span> px</strong>
-        </div>
-
-        <!--  Картинка для наглядности  -->
-        <img width="1000" src="<?php echo $src?>" style="border: 1px solid red" alt="">
-
-        <!--  Скрытый элемент с данными svg  -->
-        <div id="svg" style="display: none"><?php echo $svg?></div>
-
-        <script>
-            calcLine();
-        </script>
+    <?php if(count($output)):?>
+        <?php foreach($output as $page => $item):?>
+            <br><br><hr>
+            <!--  Результат  -->
+            <div>
+                <strong><?=$page+1?>. Длина реза: <span class="in_mm_result_<?=$page?>">0</span> mm, <span class="in_px_result_<?=$page?>">0</span> px</strong>
+            </div>
+            <!--  Картинка для наглядности  -->
+            <img width="1000" src="<?=$item['src']?>" style="border: 1px solid red" alt="">
+            <!--  Скрытый элемент с данными svg  -->
+            <div class="svg_<?=$page?>" style="display: none"><?=$item['svg']?></div>
+            <!---->
+            <script>
+                calcLine(<?=$page?>);
+            </script>
+        <?php endforeach?>
     <?php endif?>
 </body>
-
 </html>
