@@ -11,13 +11,15 @@ const UPLOAD_SVG = __DIR__.UPLOAD_SVG_SRC;
 $file = $_FILES['upload'];
 
 // определяем шаблонные переменные
-$output = (function ($file) {
-    $data = [];
+$pages = (function ($file) {
+    $pages = [];
     //
     if($file){
+        // копируем файл в uploads
         if(!copy($file['tmp_name'], UPLOAD_ORIGINAL.$file['name']))
             throw new Exception("Unable copy file to uploads directory");
 
+        // разбиваем на страницы
         $img = new Imagick();
         $img->pingImage(UPLOAD_ORIGINAL.$file['name']);
 
@@ -34,19 +36,17 @@ $output = (function ($file) {
             // если скрипт вернул не 0, отображаем вывод
             if($return){
                 var_dump('<pre>', $out, '</pre>');
-                return $data;
+                return $pages;
             }
-            //
-            $data[] = [
-                // присваиваем $src
+            // добавляем страницу
+            $pages[] = [
                 'src' => UPLOAD_SVG_SRC."{$file['name']}_{$p}.svg",
-                // присваиваем $svg
                 'svg' => file_get_contents(UPLOAD_SVG."{$file['name']}_{$p}.svg")
             ];
         }
     }
     //
-    return $data;
+    return $pages;
 })($file);
 //
 ?>
@@ -91,20 +91,20 @@ $output = (function ($file) {
         <input type="submit" value="Загрузить">
     </form>
 
-    <?php if(count($output)):?>
-        <?php foreach($output as $page => $item):?>
+    <?php if(count($pages)):?>
+        <?php foreach($pages as $page_num => $page):?>
             <br><br><hr>
             <!--  Результат  -->
             <div>
-                <strong><?=$page+1?>. Длина реза: <span class="in_mm_result_<?=$page?>">0</span> mm, <span class="in_px_result_<?=$page?>">0</span> px</strong>
+                <strong><?=$page_num+1?>. Длина реза: <span class="in_mm_result_<?=$page_num?>">0</span> mm, <span class="in_px_result_<?=$page_num?>">0</span> px</strong>
             </div>
             <!--  Картинка для наглядности  -->
-            <img width="1000" src="<?=$item['src']?>" style="border: 1px solid red" alt="">
+            <img width="1000" src="<?=$page['src']?>" style="border: 1px solid red" alt="">
             <!--  Скрытый элемент с данными svg  -->
-            <div class="svg_<?=$page?>" style="display: none"><?=$item['svg']?></div>
+            <div class="svg_<?=$page_num?>" style="display: none"><?=$page['svg']?></div>
             <!---->
             <script>
-                calcLine(<?=$page?>);
+                calcLine(<?=$page_num?>);
             </script>
         <?php endforeach?>
     <?php endif?>
