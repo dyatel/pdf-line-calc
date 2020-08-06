@@ -32,6 +32,8 @@ $pages = (function ($file) {
         if(!copy($file['tmp_name'], UPLOAD_ORIGINAL.$file['name']))
             throw new Exception("Unable copy file to uploads directory");
 
+        $info = pathinfo(UPLOAD_ORIGINAL.$file['name']);
+
         writeLog($file);
 
         // разбиваем на страницы
@@ -52,6 +54,23 @@ $pages = (function ($file) {
             if($return){
                 var_dump('<pre>', $out, '</pre>');
                 return $pages;
+            }
+            //
+            if(!file_exists(UPLOAD_SVG."{$file['name']}_{$p}.svg")){
+                if(in_array(strtolower($info['extension']), ['ai','pdf'])){
+                    $name = $file['name'].'.eps';
+                    //
+                    if(!copy(UPLOAD_ORIGINAL.$file['name'], UPLOAD_ORIGINAL.$name))
+                        throw new Exception("Unable copy file to uploads directory");
+                    //
+                    $file['name'] = $name;
+                    //
+                    $p--;
+                    //
+                    continue;
+                } else {
+                    throw new \Exception('The file cannot be read. It may be damaged or has incorrect format.');
+                }
             }
             // добавляем страницу
             $pages[] = [
